@@ -105,7 +105,7 @@ class Settings {
 	public function render_logs_page() {
 		global $wpdb;
 		$table_name = $wpdb->prefix . 'emcapi_logs';
-		$logs       = $wpdb->get_results( "SELECT * FROM $table_name ORDER BY id DESC LIMIT 50" );
+		$logs = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM `' . $wpdb->prefix . 'emcapi_logs` ORDER BY id DESC LIMIT %d', 50 ) );
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Meta CAPI Logs', 'elementor-meta-capi' ); ?></h1>

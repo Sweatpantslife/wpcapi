@@ -91,6 +91,13 @@ class Elementor_Action extends Action_Base {
 	public function run( $record, $ajax_handler ) {
 		$settings = $record->get( 'form_settings' );
 		$event_name = ! empty( $settings['emcapi_event_name'] ) ? $settings['emcapi_event_name'] : 'Lead';
+
+		// Validate against the same allowlist used in the controls to prevent
+		// a tampered DB setting from sending arbitrary event names to Meta.
+		$allowed_events = [ 'Lead', 'Contact', 'Purchase', 'Schedule', 'SubmitApplication' ];
+		if ( ! in_array( $event_name, $allowed_events, true ) ) {
+			$event_name = 'Lead';
+		}
 		
 		// Map the remote fields from Elementor's fields map.
 		$raw_fields = $record->get( 'fields' );

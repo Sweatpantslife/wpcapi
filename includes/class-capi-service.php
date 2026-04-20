@@ -37,7 +37,7 @@ class CAPI_Service {
 					'event_name' => $event_name,
 					'event_time' => time(),
 					'event_id'   => $event_id,
-					'event_source_url' => isset( $_SERVER['HTTP_REFERER'] ) ? sanitize_url( $_SERVER['HTTP_REFERER'] ) : get_home_url(),
+					'event_source_url' => self::get_event_source_url(),
 					'action_source' => 'website',
 					'user_data' => $user_data,
 					'custom_data' => $custom_data,
@@ -45,11 +45,17 @@ class CAPI_Service {
 			]
 		];
 
+		// Build a log-safe copy of the payload: strip tracking cookie values
+		// (_fbp / _fbc) so they are not persisted in the database.
+		$log_payload = $payload;
+		unset( $log_payload['data'][0]['user_data']['fbp'] );
+		unset( $log_payload['data'][0]['user_data']['fbc'] );
+
 		// Log into DB as pending.
 		$log_id = Database::insert_log([
 			'event_id'   => $event_id,
 			'event_name' => $event_name,
-			'payload'    => wp_json_encode( $payload ),
+			'payload'    => wp_json_encode( $log_payload ),
 			'status'     => 'pending',
 		]);
 
@@ -117,12 +123,17 @@ class CAPI_Service {
 			return;
 		}
 
-		$url = "https://graph.facebook.com/v19.0/" . rawurlencode( $pixel_id ) . "/events?access_token=" . rawurlencode( $token );
+		$url = "https://graph.facebook.com/v19.0/" . rawurlencode( $pixel_id ) . "/events";
+
+		// Add the access token to the POST body, not the URL, so it is not
+		// recorded in web-server or proxy access logs.
+		$send_payload                 = $payload;
+		$send_payload['access_token'] = $token;
 
 		// We execute this synchronously. It adds minimal delay but guarantees
 		// we log the success/failure state to DB definitively.
 		$response = wp_remote_post( $url, [
-			'body'    => wp_json_encode( $payload ),
+			'body'    => wp_json_encode( $send_payload ),
 			'headers' => [
 				'Content-Type' => 'application/json',
 			],
@@ -156,26 +167,35 @@ class CAPI_Service {
 	/**
 	 * Helper to get the actual client IP.
 	 *
+	 * Only REMOTE_ADDR is used because HTTP_CLIENT_IP and HTTP_X_FORWARDED_FOR
+	 * are HTTP headers that any client can forge freely.
+	 *
 	 * @return string
 	 */
 	private static function get_client_ip() {
-		$ip = '';
-		if ( ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-			$ip = $_SERVER['HTTP_CLIENT_IP'];
-		} elseif ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-		} elseif ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			$ip = $_SERVER['REMOTE_ADDR'];
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
+
+		if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return $ip;
 		}
-		
-		// If multiple IPs, take the first one.
-		$ips = explode( ',', $ip );
-		$first_ip = trim( $ips[0] );
-		
-		if ( filter_var( $first_ip, FILTER_VALIDATE_IP ) ) {
-			return $first_ip;
+
+		return '';
+	}
+
+	/**
+	 * Return a validated event_source_url for the CAPI payload.
+	 *
+	 * The HTTP Referer header is used only when it points to a URL within
+	 * this site, preventing visitors from injecting arbitrary external URLs
+	 * into Meta event data. Falls back to the home URL otherwise.
+	 *
+	 * @return string
+	 */
+	private static function get_event_source_url() {
+		$referer = wp_get_referer();
+		if ( $referer && wp_parse_url( $referer, PHP_URL_HOST ) === wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+			return sanitize_url( $referer );
 		}
-		
-		return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' );
+		return home_url();
 	}
 }
