@@ -17,13 +17,6 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
-# Node/Composer (If added later)
-node_modules/
-vendor/
-npm-debug.log
-yarn-error.log
-composer.phar
-
 # Logs
 *.log
 debug.log

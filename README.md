@@ -34,4 +34,4 @@ A lightweight, server-side WordPress plugin designed to seamlessly integrate **E
 This plugin respects and employs strict WordPress core standards, including direct abstraction checks (`ABSPATH`), query parameter binding, input validation (`sanitize_text_field`), and output escaping mechanisms. All tokens and sensitive information are strictly accessed server-side and never injected into client files or inline scripts.
 
 ## License
-This project is licensed under the GPLv3 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
