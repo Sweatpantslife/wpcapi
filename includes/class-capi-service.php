@@ -85,11 +85,11 @@ class CAPI_Service {
 				$val = $data[ $field ];
 				
 				// Normalization rules per Meta: lowercase, trim.
-				$val = strtolower( trim( $val ) );
+				$val = strtolower( trim( (string) $val ) );
 				
 				// Special phone normalization (strip non numeric except +)
 				if ( 'ph' === $field ) {
-					$val = preg_replace( '/[^0-9]+/', '', $val );
+					$val = preg_replace( '/[^0-9+]+/', '', $val );
 				}
 				
 				$user_data[ $field ] = hash( 'sha256', $val );
@@ -117,7 +117,7 @@ class CAPI_Service {
 			return;
 		}
 
-		$url = "https://graph.facebook.com/v19.0/{$pixel_id}/events?access_token={$token}";
+		$url = "https://graph.facebook.com/v19.0/" . rawurlencode( $pixel_id ) . "/events?access_token=" . rawurlencode( $token );
 
 		// We execute this synchronously. It adds minimal delay but guarantees
 		// we log the success/failure state to DB definitively.
@@ -170,6 +170,12 @@ class CAPI_Service {
 		
 		// If multiple IPs, take the first one.
 		$ips = explode( ',', $ip );
-		return sanitize_text_field( trim( $ips[0] ) );
+		$first_ip = trim( $ips[0] );
+		
+		if ( filter_var( $first_ip, FILTER_VALIDATE_IP ) ) {
+			return $first_ip;
+		}
+		
+		return sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' );
 	}
 }
